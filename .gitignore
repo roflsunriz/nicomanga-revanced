@@ -1,2 +1,11 @@
 nicomanga-apks/
 COMMON-AGENTS.md
+.gradle/
+**/build/
+local.properties
+*.apk
+*.apks
+*.rvp
+*.rve
+out/
+subagents/
