@@ -15,7 +15,7 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 | ログイン状態共通のレスポンシブHomeグリッド | 実装・5.0.0 Fabric実機確認済み |
 | Nicomanga設定へ統合したReVanced設定画面 | 実装・5.0.0 Fabric実機確認済み |
 | 「現在開発中です」の描画前非表示、スクロール領域除去、設定切替 | 実装・5.0.0 Fabric実機確認済み |
-| ReVanced ManagerでのURL取込と実適用 | v0.1.2公開・v0.1.0をManager 2.6.0で実機適用確認済み |
+| ReVanced ManagerでのURL取込と実適用 | v0.1.3公開・v0.1.0をManager 2.6.0で実機適用確認済み |
 
 ## ビルド
 
