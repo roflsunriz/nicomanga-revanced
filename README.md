@@ -13,7 +13,7 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 | ログイン不要モード、List、Reading History、IndexedDB | 実装・5.0.0 Fabric実機確認済み |
 | Reading Historyから章・ページへ復帰 | 実装・5.0.0で章1／ページ10への復帰確認済み |
 | 「現在開発中です」の既定非表示と設定切替 | 実装・5.0.0 Fabric実機確認済み |
-| ReVanced ManagerでのURL取込 | リリースワークフローを実装。実リリース後のManager検証は未実施 |
+| ReVanced ManagerでのURL取込と実適用 | v0.1.0公開・Manager 2.6.0実機適用確認済み |
 
 ## ビルド
 
