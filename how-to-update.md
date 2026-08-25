@@ -13,6 +13,7 @@
 2. ベースAPKの `com.lovehug.MainApplication.onCreate()` が存在することを確認する。
 3. 広告SDKの追加・削除をManifestとDEX名前空間から確認し、`adClassPrefixes`／`adManifestPrefixes`を更新する。
 4. `CHANGELOG.md` の `[Unreleased]` を意図ベースで更新する。
+   リリース時は対象バージョン節へ日付付きで移し、`scripts/new-release-notes.ps1`でその節を抽出できることを確認する。
 5. 次を実行してRVPをビルドする。
 
 ```powershell
@@ -25,6 +26,7 @@
 7. 最新XAPKをAnti Split MまたはAPKEditorで単一APK化し、RVPを適用する。
 8. 実機では最初に `検証用パッケージ名を使用` を有効化し、公式版を消さずに起動・画面・ログを確認する。
 9. ReVanced ManagerではRVP単体ではなく、リリースの `patches.json` URLを登録し、「ストレージから選択」で単一APKを入力する。
+10. Release本文はタグと同じバージョンのCHANGELOG節だけになっていることを確認する。
 
 ## 検証
 
