@@ -23,6 +23,7 @@ public final class NicomangaRevanced {
     public static synchronized void initializeApplication(Application application) {
         if (applicationInitialized) return;
         applicationInitialized = true;
+        NetworkObserver.setContext(application);
         application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override
             public void onActivityCreated(Activity activity, Bundle state) {
@@ -44,10 +45,6 @@ public final class NicomangaRevanced {
 
     private static synchronized void initializeOnMainThread(Activity activity) {
         if (CONTROLLERS.containsKey(activity)) return;
-        View content = activity.findViewById(android.R.id.content);
-        for (View view : ViewTree.flatten(content)) {
-            if (view.getClass().getName().contains("ReactSurfaceView")) return;
-        }
         OverlayController controller = new OverlayController(activity);
         CONTROLLERS.put(activity, controller);
 
@@ -97,8 +94,10 @@ public final class NicomangaRevanced {
         }
         if ("dispatchKeyEvent".equals(name) && args != null && args.length == 1 && args[0] instanceof KeyEvent) {
             KeyEvent event = (KeyEvent) args[0];
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_BACK
-                    && controller.handleBack()) return true;
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+                if (controller.handleBack()) return true;
+                NetworkObserver.markBack();
+            }
         }
         if ("equals".equals(name) && method.getParameterTypes().length == 1) return proxy == args[0];
         if ("hashCode".equals(name) && method.getParameterTypes().length == 0) return System.identityHashCode(proxy);

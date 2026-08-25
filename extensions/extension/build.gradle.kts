@@ -14,6 +14,9 @@ dependencyLocking {
 
 android {
     namespace = "app.revanced.extension.nicomanga"
+    defaultConfig {
+        minSdk = 24
+    }
 }
 
 tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {

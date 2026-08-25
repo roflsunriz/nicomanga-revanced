@@ -8,6 +8,7 @@ final class ReVancedPreferences {
     private static final String BYPASS = "login_free_mode";
     private static final String DEVELOPMENT_NOTICE = "show_development_notice";
     private static final String LAST_TITLE = "last_manga_title";
+    private static final String LAST_ID = "last_manga_id";
     private static final String LAST_TOTAL_CHAPTERS = "last_manga_total_chapters";
     private final SharedPreferences preferences;
 
@@ -34,12 +35,16 @@ final class ReVancedPreferences {
     MangaSnapshot lastManga() {
         String title = preferences.getString(LAST_TITLE, null);
         if (title == null || title.trim().isEmpty()) return null;
-        return new MangaSnapshot(title, preferences.getInt(LAST_TOTAL_CHAPTERS, 1));
+        return new MangaSnapshot(
+                preferences.getString(LAST_ID, null),
+                title,
+                preferences.getInt(LAST_TOTAL_CHAPTERS, 1));
     }
 
     void setLastManga(MangaSnapshot manga) {
         preferences.edit()
                 .putString(LAST_TITLE, manga.title)
+                .putString(LAST_ID, manga.id)
                 .putInt(LAST_TOTAL_CHAPTERS, manga.totalChapters)
                 .apply();
     }

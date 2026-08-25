@@ -40,12 +40,17 @@ final class OverlayController {
     private final List<Button> tabButtons = new ArrayList<>();
     private final Button settingsEntry;
     private final Button addToList;
+    private final boolean fabric;
     private final Runnable tick = this::tick;
 
     private MangaSnapshot currentManga;
     private String rememberedTitle;
     private String lastProgressSignature;
     private WeakReference<View> developmentCard = new WeakReference<>(null);
+    private int developmentExpandedHeight = -1;
+    private android.graphics.Rect developmentBounds;
+    private final List<View> detailShiftedViews = new ArrayList<>();
+    private WeakReference<ViewGroup> detailSpacingParent = new WeakReference<>(null);
     private int currentSection;
     private boolean destroyed;
 
@@ -56,6 +61,14 @@ final class OverlayController {
             throw new IllegalStateException("Android content root is not a FrameLayout");
         }
         root = (FrameLayout) content;
+        boolean usesFabric = false;
+        for (View view : ViewTree.flatten(root)) {
+            if (view.getClass().getName().contains("ReactSurfaceView")) {
+                usesFabric = true;
+                break;
+            }
+        }
+        fabric = usesFabric;
         preferences = new ReVancedPreferences(activity);
         translations = Translations.from(activity);
         navigation = new NavigationController(activity, translations);
@@ -153,6 +166,7 @@ final class OverlayController {
         switch (section) {
             case 0:
                 library.hide();
+                NetworkObserver.markHome();
                 navigation.clickNativeTab(0);
                 break;
             case 1:
@@ -187,30 +201,63 @@ final class OverlayController {
     private void tick() {
         if (destroyed || activity.isFinishing()) return;
         ViewTree.hideAdViews(root);
+        MangaSnapshot observedManga = NetworkObserver.currentManga();
+        if (observedManga != null) {
+            currentManga = observedManga;
+            rememberedTitle = observedManga.title;
+            preferences.setLastManga(observedManga);
+        }
         List<View> nativeTabs = ViewTree.bottomTabs(root);
         boolean bypass = preferences.isBypassMode();
-        boolean onNativeRoot = !nativeTabs.isEmpty();
+        ReadingProgress progress = fabric
+                ? NetworkObserver.currentReadingProgress()
+                : ViewTree.readerProgress(root, currentManga);
+        if (fabric && progress == null) progress = ViewTree.readerProgress(root, currentManga);
+        if (fabric && progress != null) {
+            NetworkObserver.markReader();
+            NetworkObserver.setReaderTotalPages(progress.totalPages);
+            progress = new ReadingProgress(
+                    progress.manga,
+                    progress.chapter,
+                    Math.min(NetworkObserver.readerPage(), progress.totalPages),
+                    progress.totalPages);
+        }
+        boolean readerScreen = fabric &&
+                (NetworkObserver.screen() == NetworkObserver.SCREEN_READER || progress != null);
+        boolean detailScreen = fabric && !readerScreen &&
+                NetworkObserver.screen() == NetworkObserver.SCREEN_DETAIL;
+        boolean onNativeRoot = !nativeTabs.isEmpty() && !detailScreen && !readerScreen;
+        if (!detailScreen || !bypass) clearDetailButtonSpace();
 
-        if (bypass && onNativeRoot) {
+        if (bypass && (onNativeRoot || library.isOpen())) {
             bottomBar.setVisibility(View.VISIBLE);
             bottomBar.bringToFront();
-        } else if (!library.isOpen()) {
+        } else {
             bottomBar.setVisibility(View.GONE);
         }
 
         int selectedNative = ViewTree.selectedTab(nativeTabs);
         boolean settingsScreen = onNativeRoot && selectedNative == nativeTabs.size() - 1;
-        if ((!bypass && settingsScreen) || (bypass && currentSection == 3 && onNativeRoot)) {
+        if ((!bypass && (settingsScreen || currentSection == 3) && onNativeRoot) ||
+                (bypass && currentSection == 3 && onNativeRoot)) {
             settingsEntry.setVisibility(View.VISIBLE);
             settingsEntry.bringToFront();
         } else if (currentSection != 3 || !onNativeRoot) {
             settingsEntry.setVisibility(View.GONE);
         }
 
-        if (onNativeRoot && (selectedNative == 0 || (bypass && currentSection == 0))) {
+        if (onNativeRoot && (fabric || selectedNative == 0 || (bypass && currentSection == 0))) {
             updateDevelopmentNotice();
             addToList.setVisibility(View.GONE);
-        } else if (!onNativeRoot && !library.isOpen()) {
+        } else if (detailScreen && !library.isOpen()) {
+            if (bypass && currentManga != null) {
+                FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) addToList.getLayoutParams();
+                params.topMargin = prepareDetailButtonSpace();
+                addToList.setLayoutParams(params);
+                addToList.setVisibility(View.VISIBLE);
+                addToList.bringToFront();
+            }
+        } else if (!fabric && !onNativeRoot && !library.isOpen()) {
             MangaSnapshot snapshot = ViewTree.detailSnapshot(root, rememberedTitle);
             if (snapshot != null) {
                 currentManga = snapshot;
@@ -225,13 +272,20 @@ final class OverlayController {
                 }
             } else {
                 addToList.setVisibility(View.GONE);
-                ReadingProgress progress = ViewTree.readerProgress(root, currentManga);
                 if (bypass && progress != null && !progress.signature().equals(lastProgressSignature)) {
                     lastProgressSignature = progress.signature();
                     library.upsertHistory(progress);
                 }
             }
+        } else if (readerScreen && !library.isOpen()) {
+            clearDetailButtonSpace();
+            addToList.setVisibility(View.GONE);
+            if (bypass && progress != null && !progress.signature().equals(lastProgressSignature)) {
+                lastProgressSignature = progress.signature();
+                library.upsertHistory(progress);
+            }
         } else {
+            clearDetailButtonSpace();
             addToList.setVisibility(View.GONE);
         }
 
@@ -244,13 +298,89 @@ final class OverlayController {
             card = ViewTree.findDevelopmentCard(root);
             developmentCard = new WeakReference<>(card);
         }
-        if (card != null) card.setVisibility(preferences.showDevelopmentNotice() ? View.VISIBLE : View.GONE);
+        if (card != null) setDevelopmentSectionVisible(card, preferences.showDevelopmentNotice());
+    }
+
+    private void setDevelopmentSectionVisible(View card, boolean visible) {
+        if (!(card.getParent() instanceof ViewGroup)) {
+            card.setVisibility(visible ? View.VISIBLE : View.GONE);
+            return;
+        }
+        ViewGroup container = (ViewGroup) card.getParent();
+        android.graphics.Rect section = ViewTree.bounds(card);
+        if (section.width() > 0 && section.height() > 0) {
+            developmentBounds = new android.graphics.Rect(section);
+        } else if (developmentBounds != null) {
+            section = new android.graphics.Rect(developmentBounds);
+        }
+        ViewGroup.LayoutParams containerParams = container.getLayoutParams();
+        if (visible) {
+            if (developmentExpandedHeight > 0 && containerParams != null) {
+                containerParams.height = developmentExpandedHeight;
+                container.setLayoutParams(containerParams);
+            }
+            for (int index = 0; index < container.getChildCount(); index++) {
+                View child = container.getChildAt(index);
+                android.graphics.Rect rect = ViewTree.bounds(child);
+                if (rect.bottom > section.top && rect.top < section.bottom) child.setVisibility(View.VISIBLE);
+            }
+            return;
+        }
+
+        if (containerParams != null && developmentExpandedHeight < 0) {
+            developmentExpandedHeight = containerParams.height;
+        }
+        int contentTop = ViewTree.bounds(container).top;
+        int collapsedBottom = contentTop;
+        for (int index = 0; index < container.getChildCount(); index++) {
+            View child = container.getChildAt(index);
+            android.graphics.Rect rect = ViewTree.bounds(child);
+            if (rect.bottom > section.top && rect.top < section.bottom) {
+                child.setVisibility(View.GONE);
+            } else if (child.getVisibility() == View.VISIBLE) {
+                collapsedBottom = Math.max(collapsedBottom, rect.bottom);
+            }
+        }
+        if (containerParams != null && collapsedBottom > contentTop) {
+            containerParams.height = collapsedBottom - contentTop;
+            container.setLayoutParams(containerParams);
+        }
     }
 
     private void addCurrentManga() {
         if (currentManga == null) return;
         library.upsertList(currentManga);
         Toast.makeText(activity, translations.get(Translations.ADDED), Toast.LENGTH_SHORT).show();
+    }
+
+    private int prepareDetailButtonSpace() {
+        TextView label = ViewTree.detailViewsLabel(root);
+        if (label == null || !(label.getParent() instanceof ViewGroup)) {
+            return Math.max(dp(100), (int) (root.getHeight() * 0.51f));
+        }
+        ViewGroup parent = (ViewGroup) label.getParent();
+        if (detailSpacingParent.get() != parent) {
+            clearDetailButtonSpace();
+            detailSpacingParent = new WeakReference<>(parent);
+        }
+        int gap = dp(52);
+        int cutoff = ViewTree.bounds(label).bottom;
+        if (detailShiftedViews.isEmpty()) {
+            for (int index = 0; index < parent.getChildCount(); index++) {
+                View child = parent.getChildAt(index);
+                if (child != label && ViewTree.bounds(child).top >= cutoff - dp(2)) {
+                    child.setTranslationY(gap);
+                    detailShiftedViews.add(child);
+                }
+            }
+        }
+        return cutoff - ViewTree.bounds(root).top + dp(4);
+    }
+
+    private void clearDetailButtonSpace() {
+        for (View view : detailShiftedViews) view.setTranslationY(0f);
+        detailShiftedViews.clear();
+        detailSpacingParent.clear();
     }
 
     private void showSettingsDialog() {
@@ -293,7 +423,7 @@ final class OverlayController {
         development.setOnCheckedChangeListener((button, checked) -> {
             preferences.setShowDevelopmentNotice(checked);
             View card = developmentCard.get();
-            if (card != null) card.setVisibility(checked ? View.VISIBLE : View.GONE);
+            if (card != null) setDevelopmentSectionVisible(card, checked);
         });
         panel.addView(development);
 
@@ -305,6 +435,25 @@ final class OverlayController {
     }
 
     void captureSelection(float rawX, float rawY) {
+        if (NetworkObserver.screen() == NetworkObserver.SCREEN_READER) {
+            ViewGroup dots = ViewTree.findPageDots(root);
+            if (dots != null) {
+                android.graphics.Rect rect = ViewTree.bounds(dots);
+                int total = Math.max(1, dots.getChildCount());
+                if (rect.contains((int) rawX, (int) rawY)) {
+                    int page = (int) (((rawX - rect.left) * total) / Math.max(1, rect.width())) + 1;
+                    NetworkObserver.markReaderPage(Math.min(total, page));
+                } else if (rawY > root.getHeight() * 0.90f) {
+                    int page = NetworkObserver.readerPage();
+                    if (rawX < root.getWidth() * 0.28f) page--;
+                    if (rawX > root.getWidth() * 0.72f) page++;
+                    NetworkObserver.markReaderPage(Math.max(1, Math.min(total, page)));
+                }
+            }
+        }
+        if (rawX < root.getWidth() * 0.20f && rawY < root.getHeight() * 0.20f) {
+            NetworkObserver.markBack();
+        }
         List<View> tabs = ViewTree.bottomTabs(root);
         if (!tabs.isEmpty()) {
             if (rawY > root.getHeight() * 0.80f) {

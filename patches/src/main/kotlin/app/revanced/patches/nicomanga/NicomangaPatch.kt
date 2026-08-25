@@ -11,6 +11,10 @@ import org.w3c.dom.Node
 private const val MAIN_APPLICATION = "Lcom/lovehug/MainApplication;"
 private const val EXTENSION =
     "Lapp/revanced/extension/nicomanga/NicomangaRevanced;"
+private const val NETWORK_OBSERVER =
+    "Lapp/revanced/extension/nicomanga/NetworkObserver;"
+private const val OKHTTP_BUILDER = "Lokhttp3/OkHttpClient\$Builder;"
+private const val FABRIC_UI_MANAGER = "Lcom/facebook/react/fabric/FabricUIManager;"
 
 private val adClassPrefixes = listOf(
     "Lcom/applovin/",
@@ -43,6 +47,13 @@ private val blockedAdMethods = setOf(
     "loadRewardedAd",
     "loadRewardedVideo",
     "requestAd",
+    "run",
+    "saveEvent",
+    "sendEvent",
+    "dispatch",
+    "track",
+    "report",
+    "upload",
     "show",
     "showAd",
     "showBanner",
@@ -141,6 +152,8 @@ val useTestPackageNamePatch = resourcePatch(
         document("AndroidManifest.xml").use { document ->
             val root = document.documentElement
             root.setAttribute("package", TEST_PACKAGE_NAME)
+            (root.getElementsByTagName("application").item(0) as? Element)
+                ?.setAttribute("android:debuggable", "true")
 
             fun rewrite(node: Node) {
                 if (node is Element) {
@@ -189,6 +202,44 @@ val nicomangaRevancedPatch = bytecodePatch(
             0,
             "invoke-static { p0 }, $EXTENSION->initializeApplication(Landroid/app/Application;)V",
         )
+
+        classDefs.find { classDef -> classDef.type == OKHTTP_BUILDER }
+            ?.let { classDef ->
+                classDef.methods.find { method ->
+                    method.name == "build" &&
+                        method.parameterTypes.isEmpty() &&
+                        method.returnType == "Lokhttp3/OkHttpClient;" &&
+                        method.implementation != null
+                }?.let { method ->
+                    classDefs.getOrReplaceMutable(classDef).firstMethod(method).addInstruction(
+                        0,
+                        "invoke-static { p0 }, $NETWORK_OBSERVER->installOkHttpInterceptor(Ljava/lang/Object;)V",
+                    )
+                }
+            }
+
+        classDefs.find { classDef -> classDef.type == FABRIC_UI_MANAGER }
+            ?.let { classDef ->
+                val receiveEvents = classDef.methods.filter { method ->
+                    method.name == "receiveEvent" &&
+                        method.returnType == "V" &&
+                        method.implementation != null &&
+                        method.parameterTypes.count { it == "Ljava/lang/String;" } == 1 &&
+                        method.parameterTypes.count { it == "Lcom/facebook/react/bridge/WritableMap;" } == 1
+                }
+                val mutableClass = classDefs.getOrReplaceMutable(classDef)
+                receiveEvents.forEach { method ->
+                    val parameters = method.parameterTypes
+                    val tagParameter = if (parameters.size == 3) 0 else 1
+                    val nameParameter = parameters.indexOf("Ljava/lang/String;")
+                    val dataParameter = parameters.indexOf("Lcom/facebook/react/bridge/WritableMap;")
+                    mutableClass.firstMethod(method).addInstruction(
+                        0,
+                        "invoke-static { p0, p${tagParameter + 1}, p${nameParameter + 1}, p${dataParameter + 1} }, " +
+                            "$NETWORK_OBSERVER->onFabricEvent(Ljava/lang/Object;ILjava/lang/String;Ljava/lang/Object;)V",
+                    )
+                }
+            }
 
         classDefs
             .filter { classDef -> adClassPrefixes.any(classDef.type::startsWith) }

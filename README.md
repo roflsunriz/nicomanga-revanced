@@ -2,9 +2,7 @@
 
 Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式のRVPとしてビルドし、Nicomangaの特定バージョン番号を固定せず適用します。
 
-## 現在の実装状況
-
-このリポジトリは開発途中です。未完了の機能を完成済みとは扱いません。
+## 実装状況
 
 | 項目 | 状態 |
 |---|---|
@@ -12,9 +10,9 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 | 1.0.30〜5.0.0の7世代への適用 | CLI適用確認済み |
 | AppLovin、Google Mobile Ads、Meta Audience Network、TradPlus、Vungle、Unity Ads等の自動初期化・読込・表示遮断 | 実装・5.0.0実機確認済み |
 | 広告Activity／Provider／Service／広告識別子権限のManifest除去 | 実装・確認済み |
-| ログイン不要モード、List、Reading History、IndexedDB | 旧Paper世代向け基盤を実装中。Fabric世代は未接続 |
-| Reading Historyから章・ページへ復帰 | 実装中。Fabric世代は未接続 |
-| 「現在開発中です」の設定切替 | 実装中。5.0.0 Fabric画面は未接続 |
+| ログイン不要モード、List、Reading History、IndexedDB | 実装・5.0.0 Fabric実機確認済み |
+| Reading Historyから章・ページへ復帰 | 実装・5.0.0で章1／ページ10への復帰確認済み |
+| 「現在開発中です」の既定非表示と設定切替 | 実装・5.0.0 Fabric実機確認済み |
 | ReVanced ManagerでのURL取込 | リリースワークフローを実装。実リリース後のManager検証は未実施 |
 
 ## ビルド

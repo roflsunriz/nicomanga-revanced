@@ -1,13 +1,17 @@
 package app.revanced.extension.nicomanga;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -40,11 +44,33 @@ final class NavigationController {
 
     void resume(JSONObject record) {
         String title = record.optString("title", "").trim();
+        String id = record.optString("id", "").trim();
         int chapter = Math.max(1, record.optInt("lastChapter", 1));
         int page = Math.max(1, record.optInt("lastPage", 1));
         int totalPages = Math.max(1, record.optInt("totalPages", 1));
         if (title.isEmpty()) {
             toast(translations.get(Translations.STORAGE_ERROR));
+            return;
+        }
+        if (id.matches("^[0-9]+$")) {
+            Uri detail = new Uri.Builder()
+                    .scheme("nicomanga")
+                    .authority("posts")
+                    .appendQueryParameter("mangaId", id)
+                    .build();
+            openInternalRoute(detail);
+            handler.postDelayed(() -> {
+                Uri reader = new Uri.Builder()
+                        .scheme("nicomanga")
+                        .authority("posts")
+                        .appendPath("reader")
+                        .appendQueryParameter("mangaId", id)
+                        .appendQueryParameter("chapter", Integer.toString(chapter))
+                        .build();
+                openInternalRoute(reader);
+                NetworkObserver.markReaderPage(page);
+                handler.postDelayed(() -> jumpToPage(page, totalPages, 0), STEP_DELAY * 3);
+            }, STEP_DELAY * 4);
             return;
         }
         reachHomeThenSearch(title, chapter, page, totalPages, 0);
@@ -111,14 +137,18 @@ final class NavigationController {
             handler.postDelayed(() -> jumpToPage(page, totalPages, 0), STEP_DELAY * 2);
             return;
         }
-        EditText chapterSearch = ViewTree.firstVisibleEditText(root());
-        if (chapterSearch != null && attempts == 0) {
-            chapterSearch.setText(Integer.toString(chapter));
-            chapterSearch.setSelection(chapterSearch.length());
-            handler.postDelayed(() -> selectChapter(chapter, page, totalPages, 1), STEP_DELAY);
+        if (attempts < 5) {
+            handler.postDelayed(() -> selectChapter(chapter, page, totalPages, attempts + 1), STEP_DELAY);
             return;
         }
-        if (attempts < 4) {
+        EditText chapterSearch = ViewTree.firstVisibleEditText(root());
+        if (chapterSearch != null && attempts == 5) {
+            chapterSearch.setText(Integer.toString(chapter));
+            chapterSearch.setSelection(chapterSearch.length());
+            handler.postDelayed(() -> selectChapter(chapter, page, totalPages, attempts + 1), STEP_DELAY);
+            return;
+        }
+        if (attempts < 10) {
             handler.postDelayed(() -> selectChapter(chapter, page, totalPages, attempts + 1), STEP_DELAY);
         } else {
             toast(translations.get(Translations.STORAGE_ERROR));
@@ -135,6 +165,7 @@ final class NavigationController {
         }
         int total = dots.getChildCount() > 0 ? dots.getChildCount() : expectedTotalPages;
         int target = Math.max(1, Math.min(page, total));
+        NetworkObserver.markReaderPage(target);
         Rect rect = ViewTree.bounds(dots);
         int[] rootLocation = new int[2];
         root.getLocationOnScreen(rootLocation);
@@ -143,8 +174,10 @@ final class NavigationController {
         long now = android.os.SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
         MotionEvent up = MotionEvent.obtain(now, now + 40, MotionEvent.ACTION_UP, x, y, 0);
-        root.dispatchTouchEvent(down);
-        root.dispatchTouchEvent(up);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        activity.dispatchTouchEvent(down);
+        activity.dispatchTouchEvent(up);
         down.recycle();
         up.recycle();
     }
@@ -153,7 +186,15 @@ final class NavigationController {
         Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
     }
 
+    private void openInternalRoute(Uri destination) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, destination);
+        intent.setClass(activity, activity.getClass());
+        activity.startActivity(intent);
+    }
+
     private void tap(View target) {
+        if (target.isClickable() &&
+                target.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null)) return;
         View root = root();
         Rect rect = ViewTree.bounds(target);
         int[] rootLocation = new int[2];
@@ -163,8 +204,10 @@ final class NavigationController {
         long now = android.os.SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
         MotionEvent up = MotionEvent.obtain(now, now + 40, MotionEvent.ACTION_UP, x, y, 0);
-        root.dispatchTouchEvent(down);
-        root.dispatchTouchEvent(up);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        activity.dispatchTouchEvent(down);
+        activity.dispatchTouchEvent(up);
         down.recycle();
         up.recycle();
     }

@@ -13,6 +13,15 @@
 - ログイン不要のList／Reading Historyを端末内へ保存するため、スキーマ版と破損時復旧を備えたIndexedDB WebView基盤を追加した。
 - 日本語を含む主要11言語とアラビア語／ウルドゥー語のRTL表示に対応する翻訳基盤を追加した。
 - RVPとManager用`patches.json`を同じリリースへ公開するGitHub Actionsワークフローを追加した。
+- React Native Fabric世代へ、ログイン不要の4等分タブ、IndexedDB List／Reading History、マンガIDベースの章・ページ復帰を追加した。
+- 詳細画面の「ビュー」直下へ専用余白付きの「リストに追加」ボタンを追加した。
+- Homeの「現在開発中です」を余白ごと既定非表示にし、Nicomanga ReVanced設定から再表示できるようにした。
+
+### Fixed
+
+- Fabric生成前のView判定によりv5.0.0で拡張UIが無効になる問題を修正した。
+- 広告初期化遮断後のTradPlus残存イベントと、OkHttpキャンセル例外の反射ラップによるクラッシュを修正した。
+- 長いタイトルの検索に依存した履歴復帰を、`mangaId`／`chapter`内部ルートへ変更した。
 
 ### Security
 

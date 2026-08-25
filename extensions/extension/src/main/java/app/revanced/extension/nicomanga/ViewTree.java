@@ -111,6 +111,22 @@ final class ViewTree {
     static View findDevelopmentCard(View root) {
         int rootWidth = root.getWidth();
         int rootHeight = root.getHeight();
+        for (View view : flatten(root)) {
+            if (!(view instanceof TextView) || !isShown(view)) continue;
+            CharSequence text = ((TextView) view).getText();
+            if (text == null || (!text.toString().contains("現在開発中") &&
+                    !text.toString().toLowerCase(java.util.Locale.ROOT).contains("under development"))) continue;
+            if (!(view.getParent() instanceof ViewGroup)) continue;
+            ViewGroup parent = (ViewGroup) view.getParent();
+            Rect title = bounds(view);
+            for (int index = 0; index < parent.getChildCount(); index++) {
+                View sibling = parent.getChildAt(index);
+                if (!(sibling instanceof ViewGroup)) continue;
+                Rect rect = bounds(sibling);
+                if (rect.width() >= rootWidth * 0.75 && rect.height() >= rootHeight * 0.16 &&
+                        rect.contains(title.centerX(), title.centerY())) return sibling;
+            }
+        }
         View best = null;
         long bestArea = Long.MAX_VALUE;
         for (View view : flatten(root)) {
@@ -164,8 +180,24 @@ final class ViewTree {
         return new MangaSnapshot(rememberedTitle, maxHeaderNumber);
     }
 
+    static TextView detailViewsLabel(View root) {
+        int rootHeight = root.getHeight();
+        for (View view : flatten(root)) {
+            if (!(view instanceof TextView) || !isShown(view)) continue;
+            Rect rect = bounds(view);
+            if (rect.top < rootHeight * 0.35f || rect.top > rootHeight * 0.62f) continue;
+            CharSequence text = ((TextView) view).getText();
+            if (text == null) continue;
+            String value = text.toString().trim().toLowerCase(java.util.Locale.ROOT);
+            if ((value.contains("ビュー:") || value.startsWith("view:")) && value.length() < 80) {
+                return (TextView) view;
+            }
+        }
+        return null;
+    }
+
     static ReadingProgress readerProgress(View root, MangaSnapshot manga) {
-        if (manga == null || !bottomTabs(root).isEmpty()) return null;
+        if (manga == null) return null;
         ViewGroup dots = findPageDots(root);
         if (dots == null) return null;
         int totalPages = dots.getChildCount();
@@ -299,18 +331,30 @@ final class ViewTree {
     }
 
     static View firstClickableStartingWithNumber(View root, int number) {
-        String prefix = Integer.toString(number);
+        Pattern exactPrefix = Pattern.compile("^\\s*" + number + "(?:\\D|$)");
+        View best = null;
+        View bestClickable = null;
+        int smallestArea = Integer.MAX_VALUE;
+        int smallestClickableArea = Integer.MAX_VALUE;
         for (View view : flatten(root)) {
-            if (!isShown(view)) continue;
+            if (!isShown(view) || view instanceof EditText) continue;
             CharSequence description = view.getContentDescription();
-            if (description != null && description.toString().trim().startsWith(prefix)) return view;
-            for (View child : flatten(view)) {
-                if (!(child instanceof TextView)) continue;
-                CharSequence text = ((TextView) child).getText();
-                if (text != null && text.toString().trim().startsWith(prefix)) return view;
+            CharSequence text = view instanceof TextView ? ((TextView) view).getText() : null;
+            boolean matches = description != null && exactPrefix.matcher(description).find();
+            if (!matches) matches = text != null && exactPrefix.matcher(text).find();
+            if (!matches) continue;
+            Rect rect = bounds(view);
+            int area = rect.width() * rect.height();
+            if (view.isClickable() && area < smallestClickableArea) {
+                bestClickable = view;
+                smallestClickableArea = area;
+            }
+            if (area < smallestArea) {
+                best = view;
+                smallestArea = area;
             }
         }
-        return null;
+        return bestClickable == null ? best : bestClickable;
     }
 
     static View topCornerButton(View root, boolean right) {
