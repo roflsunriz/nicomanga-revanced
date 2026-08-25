@@ -48,7 +48,7 @@ jobs:
             -Version $env:VERSION `
             -CreatedAt ([DateTimeOffset]::UtcNow.ToString('O')) `
             -OutputPath dist/patches.json
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/patches.rvp
       - name: Publish release
