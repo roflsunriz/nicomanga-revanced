@@ -49,6 +49,27 @@ final class NavigationController {
         NetworkObserver.markSettings();
     }
 
+    void openManga(String id) {
+        if (id == null || !id.matches("^[0-9]+$")) return;
+        Uri destination = new Uri.Builder()
+                .scheme("nicomanga")
+                .authority("posts")
+                .appendQueryParameter("mangaId", id)
+                .build();
+        NetworkObserver.markDetail();
+        openInternalRoute(destination);
+    }
+
+    void openSearch() {
+        View search = ViewTree.topCornerButton(root(), true);
+        if (search == null) {
+            toast(translations.get(Translations.STORAGE_ERROR));
+            return;
+        }
+        NetworkObserver.markOther();
+        tap(search);
+    }
+
     void resume(JSONObject record) {
         String title = record.optString("title", "").trim();
         String id = record.optString("id", "").trim();

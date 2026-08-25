@@ -1,7 +1,9 @@
 package app.revanced.extension.nicomanga;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.net.Uri;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.TextView;
@@ -32,6 +34,7 @@ public final class NetworkObserver {
     static final int SCREEN_DETAIL = 1;
     static final int SCREEN_READER = 2;
     static final int SCREEN_SETTINGS = 3;
+    static final int SCREEN_OTHER = 4;
     private static final int MAX_CAPTURE_BYTES = 1_500_000;
     private static final Set<Object> INSTALLED_BUILDERS =
             Collections.newSetFromMap(Collections.synchronizedMap(new WeakHashMap<>()));
@@ -44,6 +47,9 @@ public final class NetworkObserver {
     private static volatile int readerChapter = 1;
     private static volatile boolean readerPagesFromNetwork;
     private static final Map<Integer, Integer> CHAPTER_PAGES = new ConcurrentHashMap<>();
+    private static final Map<String, String> HOME_COLLECTIONS = new ConcurrentHashMap<>();
+    private static final String HOME_CACHE = "nicomanga_revanced_home";
+    private static volatile long homeVersion;
     private static final Pattern CHAPTER_NUMBER = Pattern.compile("^\\s*([0-9]+)(?:\\.[0-9]+)?\\s*(?:章|chapter)", Pattern.CASE_INSENSITIVE);
 
     private NetworkObserver() {}
@@ -128,10 +134,42 @@ public final class NetworkObserver {
         screen = SCREEN_SETTINGS;
     }
 
+    static void markDetail() {
+        screen = SCREEN_DETAIL;
+    }
+
+    static void markOther() {
+        screen = SCREEN_OTHER;
+    }
+
     static void markBack() {
         if (screen == SCREEN_READER) screen = SCREEN_DETAIL;
         else if (screen == SCREEN_DETAIL) screen = SCREEN_HOME;
         else if (screen == SCREEN_SETTINGS) screen = SCREEN_HOME;
+        else if (screen == SCREEN_OTHER) screen = SCREEN_HOME;
+    }
+
+    static long homeVersion() {
+        return homeVersion;
+    }
+
+    static String homePayload() {
+        JSONObject result = new JSONObject();
+        Context value = context;
+        SharedPreferences cache = value == null ? null
+                : value.getSharedPreferences(HOME_CACHE, Context.MODE_PRIVATE);
+        try {
+            for (String category : new String[]{"new", "top", "update"}) {
+                String json = HOME_COLLECTIONS.get(category);
+                if ((json == null || json.isEmpty()) && cache != null) {
+                    json = cache.getString(category, null);
+                }
+                if (json != null && !json.isEmpty()) result.put(category, new JSONArray(json));
+            }
+        } catch (JSONException ignored) {
+            return "{}";
+        }
+        return result.toString();
     }
 
     static int readerPage() {
@@ -274,7 +312,9 @@ public final class NetworkObserver {
 
     private static void observeResponse(String url, Object parsed) {
         try {
-            if (parsed instanceof JSONObject && url.matches(".*/manga/[^/?]+$")) {
+            if (parsed instanceof JSONArray && url.contains("/manga/collection?")) {
+                captureHomeCollection(url, (JSONArray) parsed);
+            } else if (parsed instanceof JSONObject && url.matches(".*/manga/[^/?]+$")) {
                 JSONObject manga = (JSONObject) parsed;
                 String id = manga.optString("id", url.substring(url.lastIndexOf('/') + 1));
                 String title = manga.optString("name", "Nicomanga");
@@ -299,12 +339,45 @@ public final class NetworkObserver {
                     currentManga = manga.withTotalChapters(chapters.length());
                 }
                 if (screen != SCREEN_READER) screen = SCREEN_DETAIL;
-            } else if (currentManga == null && url.contains("/manga/collection?")) {
-                screen = SCREEN_HOME;
             }
         } catch (RuntimeException ignored) {
             // A response schema change must not affect the app.
         }
+    }
+
+    private static void captureHomeCollection(String url, JSONArray source) {
+        String category = Uri.parse(url).getQueryParameter("desc");
+        if (!"new".equals(category) && !"top".equals(category) && !"update".equals(category)) return;
+        JSONArray rows = new JSONArray();
+        try {
+            for (int index = 0; index < Math.min(25, source.length()); index++) {
+                JSONObject input = source.optJSONObject(index);
+                if (input == null) continue;
+                String id = input.optString("id", "").trim();
+                String name = input.optString("name", "").trim();
+                if (id.isEmpty() || name.isEmpty()) continue;
+                String cover = input.optString("cover", "").trim();
+                Uri coverUri = Uri.parse(cover);
+                if (!"https".equalsIgnoreCase(coverUri.getScheme()) || coverUri.getHost() == null) cover = "";
+                rows.put(new JSONObject()
+                        .put("id", id)
+                        .put("name", name)
+                        .put("cover", cover)
+                        .put("authors", input.optString("authors", input.optString("artists", "")))
+                        .put("artists", input.optString("artists", ""))
+                        .put("genres", input.optString("genres", ""))
+                        .put("lastChapter", input.opt("lastChapter"))
+                        .put("lastUpdate", input.optString("lastUpdate", "")));
+            }
+        } catch (JSONException ignored) {
+            return;
+        }
+        String json = rows.toString();
+        HOME_COLLECTIONS.put(category, json);
+        Context value = context;
+        if (value != null) value.getSharedPreferences(HOME_CACHE, Context.MODE_PRIVATE)
+                .edit().putString(category, json).apply();
+        homeVersion++;
     }
 
     private static String summarize(Object value) {

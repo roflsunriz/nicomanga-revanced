@@ -33,6 +33,9 @@ final class Translations {
     static final String PAGE = "page";
     static final String READ = "read";
     static final String STORAGE_ERROR = "storageError";
+    static final String SEARCH = "search";
+    static final String DEV_NOTICE_TITLE = "devNoticeTitle";
+    static final String DEV_NOTICE_BODY = "devNoticeBody";
 
     private final Map<String, String> values;
     private final boolean rtl;
@@ -103,6 +106,8 @@ final class Translations {
         map.put(EMPTY_HISTORY, "Reading History is empty."); map.put(RESUME, "Resume");
         map.put(REMOVE, "Remove"); map.put(CHAPTER, "Chapter"); map.put(PAGE, "Page");
         map.put(READ, "read"); map.put(STORAGE_ERROR, "Local data was recovered after a storage error.");
+        map.put(SEARCH, "Search"); map.put(DEV_NOTICE_TITLE, "Nicomanga is under development");
+        map.put(DEV_NOTICE_BODY, "Some features may be incomplete while development continues.");
         return map;
     }
 
@@ -114,6 +119,8 @@ final class Translations {
         m.put(EMPTY_HISTORY,"読書履歴はありません。"); m.put(RESUME,"続きを読む"); m.put(REMOVE,"削除");
         m.put(CHAPTER,"章"); m.put(PAGE,"ページ"); m.put(READ,"読了");
         m.put(STORAGE_ERROR,"保存エラー後にローカルデータを復旧しました。");
+        m.put(SEARCH,"検索"); m.put(DEV_NOTICE_TITLE,"アプリは現在開発中です");
+        m.put(DEV_NOTICE_BODY,"現在も開発を継続しています。一部の機能が未完成の場合があります。");
     }
 
     private static void chinese(Map<String, String> m) {

@@ -32,6 +32,7 @@ final class OverlayController {
     private final Translations translations;
     private final NavigationController navigation;
     private final DevelopmentNoticeController developmentNotice;
+    private final HomeWebView home;
     private final LibraryWebView library;
     private final LinearLayout bottomBar;
     private final List<Button> tabButtons = new ArrayList<>();
@@ -43,6 +44,8 @@ final class OverlayController {
     private MangaSnapshot currentManga;
     private String rememberedTitle;
     private String lastProgressSignature;
+    private long lastHomeVersion = -1L;
+    private int nativeTabIndex;
     private final List<View> detailShiftedViews = new ArrayList<>();
     private WeakReference<ViewGroup> detailSpacingParent = new WeakReference<>(null);
     private int currentSection;
@@ -69,6 +72,14 @@ final class OverlayController {
         this.developmentNotice = developmentNotice;
         currentManga = preferences.lastManga();
         rememberedTitle = currentManga == null ? null : currentManga.title;
+
+        home = new HomeWebView(activity, navigation, translations);
+        home.setTag(ViewTree.OVERLAY_TAG);
+        FrameLayout.LayoutParams homeParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        homeParams.bottomMargin = dp(72);
+        root.addView(home, homeParams);
+        home.setDevelopmentNotice(preferences.showDevelopmentNotice());
 
         library = new LibraryWebView(activity, navigation, translations);
         library.setTag(ViewTree.OVERLAY_TAG);
@@ -99,6 +110,7 @@ final class OverlayController {
                     @Override
                     public void onDevelopmentNoticeChanged(boolean visible) {
                         developmentNotice.setVisible(visible);
+                        home.setDevelopmentNotice(visible);
                     }
                 });
 
@@ -173,16 +185,20 @@ final class OverlayController {
                 library.hide();
                 settingsView.hidePage();
                 navigation.openHome();
+                home.show();
                 break;
             case 1:
+                home.hide();
                 settingsView.hidePage();
                 showLibrary("list");
                 break;
             case 2:
+                home.hide();
                 settingsView.hidePage();
                 showLibrary("history");
                 break;
             case 3:
+                home.hide();
                 library.hide();
                 settingsView.hidePage();
                 navigation.openSettings();
@@ -193,6 +209,7 @@ final class OverlayController {
     }
 
     private void showLibrary(String screen) {
+        home.hide();
         library.show(screen);
         library.bringToFront();
         bottomBar.bringToFront();
@@ -237,9 +254,28 @@ final class OverlayController {
         boolean settingsScreen = settingsContentBottom > 0 &&
                 (NetworkObserver.screen() == NetworkObserver.SCREEN_SETTINGS || currentSection == 3);
         if (settingsScreen) ViewTree.labelNativeSettings(root, translations.get(Translations.SETTINGS));
+        else if (!bypass && onNativeRoot) {
+            ViewTree.labelNativeSettingsTab(root, translations.get(Translations.SETTINGS));
+        }
         if (!detailScreen || !bypass) clearDetailButtonSpace();
 
-        if (bypass && (onNativeRoot || library.isOpen())) {
+        long observedHomeVersion = NetworkObserver.homeVersion();
+        if (lastHomeVersion != observedHomeVersion || lastHomeVersion < 0) {
+            lastHomeVersion = observedHomeVersion;
+            home.update(NetworkObserver.homePayload());
+        }
+        int selectedNative = ViewTree.selectedTab(nativeTabs);
+        boolean homeScreen = home.hasData() && !settingsScreen &&
+                NetworkObserver.screen() == NetworkObserver.SCREEN_HOME &&
+                (bypass ? currentSection == 0 : nativeTabIndex == 0);
+        if (homeScreen && !library.isOpen() && !settingsView.isPageOpen()) {
+            home.show();
+        } else {
+            home.hide();
+        }
+
+        if (bypass && (onNativeRoot || home.isOpen() || library.isOpen() ||
+                settingsScreen || settingsView.isPageOpen())) {
             bottomBar.setVisibility(View.VISIBLE);
             bottomBar.bringToFront();
         } else {
@@ -254,7 +290,9 @@ final class OverlayController {
         settingsView.bringPageToFront();
         if (settingsView.isPageOpen() && bypass) bottomBar.bringToFront();
 
-        int selectedNative = ViewTree.selectedTab(nativeTabs);
+        if (home.isOpen()) home.bringToFront();
+        if (home.isOpen() && bypass) bottomBar.bringToFront();
+
         if (onNativeRoot && !settingsScreen && !settingsView.isPageOpen() &&
                 (currentSection == 0 || (!fabric && selectedNative == 0))) {
             addToList.setVisibility(View.GONE);
@@ -372,12 +410,16 @@ final class OverlayController {
                     }
                 }
                 if (!preferences.isBypassMode()) {
+                    nativeTabIndex = closest;
                     if (closest == tabs.size() - 1) {
                         currentSection = 3;
                         NetworkObserver.markSettings();
-                    } else {
+                    } else if (closest == 0) {
                         currentSection = 0;
                         NetworkObserver.markHome();
+                    } else {
+                        currentSection = 0;
+                        NetworkObserver.markOther();
                     }
                     updateTabColors();
                 }
@@ -404,8 +446,10 @@ final class OverlayController {
         if (destroyed) return;
         destroyed = true;
         handler.removeCallbacksAndMessages(null);
+        home.dispose();
         library.dispose();
         settingsView.dispose();
+        root.removeView(home);
         root.removeView(library);
         root.removeView(bottomBar);
         root.removeView(addToList);

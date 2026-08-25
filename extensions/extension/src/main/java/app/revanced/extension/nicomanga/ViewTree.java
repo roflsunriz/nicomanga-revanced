@@ -145,6 +145,10 @@ final class ViewTree {
                 break;
             }
         }
+        labelNativeSettingsTab(root, settingsLabel);
+    }
+
+    static void labelNativeSettingsTab(View root, String settingsLabel) {
         List<View> tabs = bottomTabs(root);
         if (!tabs.isEmpty() && tabs.get(tabs.size() - 1) instanceof TextView) {
             ((TextView) tabs.get(tabs.size() - 1)).setText(settingsLabel);
