@@ -35,11 +35,18 @@ final class NavigationController {
         return activity.findViewById(android.R.id.content);
     }
 
-    void clickNativeTab(int index) {
-        List<View> tabs = ViewTree.bottomTabs(root());
-        if (tabs.isEmpty()) return;
-        int resolved = index < 0 ? tabs.size() - 1 : Math.min(index, tabs.size() - 1);
-        tap(tabs.get(resolved));
+    void openHome() {
+        openInternalRoute(Uri.parse("nicomanga://"));
+        NetworkObserver.markHome();
+    }
+
+    void openSettings() {
+        Uri destination = new Uri.Builder()
+                .scheme("nicomanga")
+                .authority("setting")
+                .build();
+        openInternalRoute(destination);
+        NetworkObserver.markSettings();
     }
 
     void resume(JSONObject record) {

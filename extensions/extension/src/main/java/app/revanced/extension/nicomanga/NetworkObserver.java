@@ -31,6 +31,7 @@ public final class NetworkObserver {
     static final int SCREEN_HOME = 0;
     static final int SCREEN_DETAIL = 1;
     static final int SCREEN_READER = 2;
+    static final int SCREEN_SETTINGS = 3;
     private static final int MAX_CAPTURE_BYTES = 1_500_000;
     private static final Set<Object> INSTALLED_BUILDERS =
             Collections.newSetFromMap(Collections.synchronizedMap(new WeakHashMap<>()));
@@ -123,9 +124,14 @@ public final class NetworkObserver {
         screen = SCREEN_HOME;
     }
 
+    static void markSettings() {
+        screen = SCREEN_SETTINGS;
+    }
+
     static void markBack() {
         if (screen == SCREEN_READER) screen = SCREEN_DETAIL;
         else if (screen == SCREEN_DETAIL) screen = SCREEN_HOME;
+        else if (screen == SCREEN_SETTINGS) screen = SCREEN_HOME;
     }
 
     static int readerPage() {

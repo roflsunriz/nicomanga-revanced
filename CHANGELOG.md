@@ -6,6 +6,20 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-25
+
+### Changed
+
+- 浮遊ボタンとAndroid標準ダイアログだったNicomanga ReVanced設定を、Nicomangaの設定カードと同じ外観の入口およびアプリ内全画面設定へ変更した。
+
+### Fixed
+
+- ログイン不要モードの設定タブがFabric画面で反応せず、Homeのままになる問題を内部設定ルートへの遷移に変更して修正した。
+- Nicomanga 5.0.0の設定画面で見出しとタブ名がHomeになる表示を、設定として表示するよう修正した。
+- 「現在開発中です」を非表示にしてもReact Nativeのスクロール領域が残り、空白へ縦スクロールできる問題を修正した。
+
+## [0.1.0] - 2026-08-25
+
 ### Added
 
 - Nicomangaへバージョン番号を固定せず適用できるよう、ReVanced Patcher v22対応のRVP基盤と全世代共通のApplication lifecycleフックを追加した。

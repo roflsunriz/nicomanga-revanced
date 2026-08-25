@@ -1,7 +1,6 @@
 package app.revanced.extension.nicomanga;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
@@ -12,9 +11,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,7 +34,7 @@ final class OverlayController {
     private final LibraryWebView library;
     private final LinearLayout bottomBar;
     private final List<Button> tabButtons = new ArrayList<>();
-    private final Button settingsEntry;
+    private final NicomangaSettingsView settingsView;
     private final Button addToList;
     private final boolean fabric;
     private final Runnable tick = this::tick;
@@ -49,6 +45,11 @@ final class OverlayController {
     private WeakReference<View> developmentCard = new WeakReference<>(null);
     private int developmentExpandedHeight = -1;
     private android.graphics.Rect developmentBounds;
+    private boolean developmentLayoutCaptured;
+    private boolean developmentOriginalFillViewport;
+    private int developmentOriginalOverScrollMode = View.OVER_SCROLL_ALWAYS;
+    private WeakReference<android.widget.ScrollView> developmentScroll = new WeakReference<>(null);
+    private android.view.ViewTreeObserver.OnScrollChangedListener developmentScrollGuard;
     private final List<View> detailShiftedViews = new ArrayList<>();
     private WeakReference<ViewGroup> detailSpacingParent = new WeakReference<>(null);
     private int currentSection;
@@ -88,13 +89,25 @@ final class OverlayController {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(72), Gravity.BOTTOM);
         root.addView(bottomBar, barParams);
 
-        settingsEntry = createFloatingButton(translations.get(Translations.TITLE));
-        settingsEntry.setTag(ViewTree.OVERLAY_TAG);
-        settingsEntry.setOnClickListener(view -> showSettingsDialog());
-        FrameLayout.LayoutParams settingsParams = new FrameLayout.LayoutParams(dp(230), dp(48), Gravity.TOP | Gravity.END);
-        settingsParams.topMargin = dp(72);
-        settingsParams.rightMargin = dp(14);
-        root.addView(settingsEntry, settingsParams);
+        settingsView = new NicomangaSettingsView(
+                activity,
+                root,
+                preferences,
+                translations,
+                new NicomangaSettingsView.Listener() {
+                    @Override
+                    public void onModeChanged(boolean bypass) {
+                        currentSection = 3;
+                        library.hide();
+                        updateTabColors();
+                    }
+
+                    @Override
+                    public void onDevelopmentNoticeChanged(boolean visible) {
+                        View card = developmentCard.get();
+                        if (card != null) setDevelopmentSectionVisible(card, visible);
+                    }
+                });
 
         addToList = createFloatingButton("＋ " + translations.get(Translations.ADD_LIST));
         addToList.setTag(ViewTree.OVERLAY_TAG);
@@ -104,7 +117,6 @@ final class OverlayController {
         root.addView(addToList, addParams);
 
         bottomBar.setVisibility(View.GONE);
-        settingsEntry.setVisibility(View.GONE);
         addToList.setVisibility(View.GONE);
         handler.post(tick);
     }
@@ -161,25 +173,26 @@ final class OverlayController {
     private void selectSection(int section) {
         currentSection = section;
         updateTabColors();
-        settingsEntry.setVisibility(View.GONE);
+        settingsView.hideEntry();
         addToList.setVisibility(View.GONE);
         switch (section) {
             case 0:
                 library.hide();
-                NetworkObserver.markHome();
-                navigation.clickNativeTab(0);
+                settingsView.hidePage();
+                navigation.openHome();
                 break;
             case 1:
+                settingsView.hidePage();
                 showLibrary("list");
                 break;
             case 2:
+                settingsView.hidePage();
                 showLibrary("history");
                 break;
             case 3:
                 library.hide();
-                navigation.clickNativeTab(-1);
-                settingsEntry.setVisibility(View.VISIBLE);
-                settingsEntry.bringToFront();
+                settingsView.hidePage();
+                navigation.openSettings();
                 break;
             default:
                 break;
@@ -227,6 +240,10 @@ final class OverlayController {
         boolean detailScreen = fabric && !readerScreen &&
                 NetworkObserver.screen() == NetworkObserver.SCREEN_DETAIL;
         boolean onNativeRoot = !nativeTabs.isEmpty() && !detailScreen && !readerScreen;
+        int settingsContentBottom = ViewTree.nativeSettingsContentBottom(root);
+        boolean settingsScreen = settingsContentBottom > 0 &&
+                (NetworkObserver.screen() == NetworkObserver.SCREEN_SETTINGS || currentSection == 3);
+        if (settingsScreen) ViewTree.labelNativeSettings(root, translations.get(Translations.SETTINGS));
         if (!detailScreen || !bypass) clearDetailButtonSpace();
 
         if (bypass && (onNativeRoot || library.isOpen())) {
@@ -236,18 +253,20 @@ final class OverlayController {
             bottomBar.setVisibility(View.GONE);
         }
 
-        int selectedNative = ViewTree.selectedTab(nativeTabs);
-        boolean settingsScreen = onNativeRoot && selectedNative == nativeTabs.size() - 1;
-        if ((!bypass && (settingsScreen || currentSection == 3) && onNativeRoot) ||
-                (bypass && currentSection == 3 && onNativeRoot)) {
-            settingsEntry.setVisibility(View.VISIBLE);
-            settingsEntry.bringToFront();
-        } else if (currentSection != 3 || !onNativeRoot) {
-            settingsEntry.setVisibility(View.GONE);
+        if (settingsScreen && currentSection == 3 && !library.isOpen() && !settingsView.isPageOpen()) {
+            settingsView.showEntry(settingsContentBottom + dp(16), root.getHeight() - dp(72));
+        } else {
+            settingsView.hideEntry();
         }
+        settingsView.bringPageToFront();
+        if (settingsView.isPageOpen() && bypass) bottomBar.bringToFront();
 
-        if (onNativeRoot && (fabric || selectedNative == 0 || (bypass && currentSection == 0))) {
+        int selectedNative = ViewTree.selectedTab(nativeTabs);
+        if (onNativeRoot && !settingsScreen && !settingsView.isPageOpen() &&
+                (currentSection == 0 || (!fabric && selectedNative == 0))) {
             updateDevelopmentNotice();
+            addToList.setVisibility(View.GONE);
+        } else if (settingsScreen || settingsView.isPageOpen()) {
             addToList.setVisibility(View.GONE);
         } else if (detailScreen && !library.isOpen()) {
             if (bypass && currentManga != null) {
@@ -294,11 +313,20 @@ final class OverlayController {
 
     private void updateDevelopmentNotice() {
         View card = developmentCard.get();
-        if (card == null || card.getParent() == null) {
+        if (card == null || card.getParent() == null || !card.isAttachedToWindow()) {
+            resetDevelopmentTracking();
             card = ViewTree.findDevelopmentCard(root);
             developmentCard = new WeakReference<>(card);
         }
         if (card != null) setDevelopmentSectionVisible(card, preferences.showDevelopmentNotice());
+    }
+
+    private void resetDevelopmentTracking() {
+        removeDevelopmentScrollGuard();
+        developmentLayoutCaptured = false;
+        developmentExpandedHeight = -1;
+        developmentBounds = null;
+        developmentScroll.clear();
     }
 
     private void setDevelopmentSectionVisible(View card, boolean visible) {
@@ -314,22 +342,35 @@ final class OverlayController {
             section = new android.graphics.Rect(developmentBounds);
         }
         ViewGroup.LayoutParams containerParams = container.getLayoutParams();
+        android.widget.ScrollView scroll = container.getParent() instanceof android.widget.ScrollView
+                ? (android.widget.ScrollView) container.getParent()
+                : null;
+        if (!developmentLayoutCaptured) {
+            developmentExpandedHeight = containerParams == null ? -1 : containerParams.height;
+            developmentOriginalFillViewport = scroll != null && scroll.isFillViewport();
+            developmentScroll = new WeakReference<>(scroll);
+            developmentLayoutCaptured = true;
+        }
         if (visible) {
-            if (developmentExpandedHeight > 0 && containerParams != null) {
+            if (containerParams != null) {
                 containerParams.height = developmentExpandedHeight;
                 container.setLayoutParams(containerParams);
+            }
+            android.widget.ScrollView capturedScroll = developmentScroll.get();
+            if (capturedScroll != null) {
+                removeDevelopmentScrollGuard();
+                capturedScroll.setFillViewport(developmentOriginalFillViewport);
+                capturedScroll.setOverScrollMode(developmentOriginalOverScrollMode);
             }
             for (int index = 0; index < container.getChildCount(); index++) {
                 View child = container.getChildAt(index);
                 android.graphics.Rect rect = ViewTree.bounds(child);
                 if (rect.bottom > section.top && rect.top < section.bottom) child.setVisibility(View.VISIBLE);
             }
+            container.requestLayout();
             return;
         }
 
-        if (containerParams != null && developmentExpandedHeight < 0) {
-            developmentExpandedHeight = containerParams.height;
-        }
         int contentTop = ViewTree.bounds(container).top;
         int collapsedBottom = contentTop;
         for (int index = 0; index < container.getChildCount(); index++) {
@@ -342,9 +383,39 @@ final class OverlayController {
             }
         }
         if (containerParams != null && collapsedBottom > contentTop) {
+            if (scroll != null) {
+                scroll.setFillViewport(false);
+                installDevelopmentScrollGuard(scroll);
+            }
+            container.setMinimumHeight(0);
             containerParams.height = collapsedBottom - contentTop;
             container.setLayoutParams(containerParams);
+            container.requestLayout();
+            if (scroll != null) scroll.requestLayout();
         }
+    }
+
+    private void installDevelopmentScrollGuard(android.widget.ScrollView scroll) {
+        if (developmentScrollGuard == null) {
+            developmentOriginalOverScrollMode = scroll.getOverScrollMode();
+            developmentScrollGuard = () -> {
+                android.widget.ScrollView current = developmentScroll.get();
+                if (current != null && !preferences.showDevelopmentNotice() && current.getScrollY() != 0) {
+                    current.scrollTo(0, 0);
+                }
+            };
+            scroll.getViewTreeObserver().addOnScrollChangedListener(developmentScrollGuard);
+        }
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        if (scroll.getScrollY() != 0) scroll.scrollTo(0, 0);
+    }
+
+    private void removeDevelopmentScrollGuard() {
+        android.widget.ScrollView scroll = developmentScroll.get();
+        if (scroll != null && developmentScrollGuard != null && scroll.getViewTreeObserver().isAlive()) {
+            scroll.getViewTreeObserver().removeOnScrollChangedListener(developmentScrollGuard);
+        }
+        developmentScrollGuard = null;
     }
 
     private void addCurrentManga() {
@@ -383,57 +454,6 @@ final class OverlayController {
         detailSpacingParent.clear();
     }
 
-    private void showSettingsDialog() {
-        LinearLayout panel = new LinearLayout(activity);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(22), dp(10), dp(22), dp(4));
-        if (translations.isRtl()) panel.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-
-        TextView modeLabel = new TextView(activity);
-        modeLabel.setText(translations.get(Translations.MODE));
-        modeLabel.setTextSize(17);
-        modeLabel.setTextColor(Color.WHITE);
-        panel.addView(modeLabel);
-
-        RadioGroup modes = new RadioGroup(activity);
-        modes.setOrientation(LinearLayout.VERTICAL);
-        RadioButton bypass = new RadioButton(activity);
-        bypass.setText(translations.get(Translations.BYPASS));
-        bypass.setTextColor(Color.WHITE);
-        RadioButton login = new RadioButton(activity);
-        login.setText(translations.get(Translations.LOGIN));
-        login.setTextColor(Color.WHITE);
-        modes.addView(bypass);
-        modes.addView(login);
-        (preferences.isBypassMode() ? bypass : login).setChecked(true);
-        modes.setOnCheckedChangeListener((group, checkedId) -> {
-            preferences.setBypassMode(bypass.isChecked());
-            if (!bypass.isChecked()) {
-                library.hide();
-                currentSection = 3;
-            }
-        });
-        panel.addView(modes);
-
-        Switch development = new Switch(activity);
-        development.setText(translations.get(Translations.DEV_NOTICE));
-        development.setTextColor(Color.WHITE);
-        development.setChecked(preferences.showDevelopmentNotice());
-        development.setPadding(0, dp(12), 0, dp(8));
-        development.setOnCheckedChangeListener((button, checked) -> {
-            preferences.setShowDevelopmentNotice(checked);
-            View card = developmentCard.get();
-            if (card != null) setDevelopmentSectionVisible(card, checked);
-        });
-        panel.addView(development);
-
-        new AlertDialog.Builder(activity)
-                .setTitle(translations.get(Translations.TITLE))
-                .setView(panel)
-                .setPositiveButton(translations.get(Translations.CLOSE), null)
-                .show();
-    }
-
     void captureSelection(float rawX, float rawY) {
         if (NetworkObserver.screen() == NetworkObserver.SCREEN_READER) {
             ViewGroup dots = ViewTree.findPageDots(root);
@@ -466,7 +486,16 @@ final class OverlayController {
                         closest = index;
                     }
                 }
-                if (!preferences.isBypassMode()) currentSection = closest == tabs.size() - 1 ? 3 : 0;
+                if (!preferences.isBypassMode()) {
+                    if (closest == tabs.size() - 1) {
+                        currentSection = 3;
+                        NetworkObserver.markSettings();
+                    } else {
+                        currentSection = 0;
+                        NetworkObserver.markHome();
+                    }
+                    updateTabColors();
+                }
                 return;
             }
             String title = ViewTree.mangaTitleAt(root, rawX, rawY);
@@ -475,22 +504,26 @@ final class OverlayController {
     }
 
     boolean handleBack() {
-        if (!library.isOpen()) return false;
-        library.hide();
-        currentSection = 0;
-        updateTabColors();
-        navigation.clickNativeTab(0);
-        return true;
+        if (settingsView.handleBack()) return true;
+        if (library.isOpen()) {
+            library.hide();
+            currentSection = 0;
+            updateTabColors();
+            navigation.openHome();
+            return true;
+        }
+        return false;
     }
 
     void destroy() {
         if (destroyed) return;
         destroyed = true;
         handler.removeCallbacksAndMessages(null);
+        removeDevelopmentScrollGuard();
         library.dispose();
+        settingsView.dispose();
         root.removeView(library);
         root.removeView(bottomBar);
-        root.removeView(settingsEntry);
         root.removeView(addToList);
     }
 

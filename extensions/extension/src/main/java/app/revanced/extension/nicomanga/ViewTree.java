@@ -108,6 +108,49 @@ final class ViewTree {
         }
     }
 
+    static int nativeSettingsContentBottom(View root) {
+        int rootWidth = root.getWidth();
+        int rootHeight = root.getHeight();
+        int cardCount = 0;
+        int bottom = 0;
+        for (View view : flatten(root)) {
+            if (!(view instanceof ViewGroup) || !isShown(view)) continue;
+            Rect rect = bounds(view);
+            if (rect.width() < rootWidth * 0.78f || rect.width() > rootWidth * 0.98f ||
+                    rect.height() < rootHeight * 0.08f || rect.height() > rootHeight * 0.24f ||
+                    rect.left > rootWidth * 0.12f || rect.top < rootHeight * 0.07f ||
+                    rect.bottom > rootHeight * 0.88f || view.getBackground() == null) continue;
+            int textChildren = 0;
+            for (View child : flatten(view)) {
+                if (child instanceof TextView) {
+                    CharSequence text = ((TextView) child).getText();
+                    if (text != null && text.length() > 0) textChildren++;
+                }
+            }
+            if (textChildren < 2) continue;
+            cardCount++;
+            bottom = Math.max(bottom, rect.bottom);
+        }
+        return cardCount >= 3 ? bottom : -1;
+    }
+
+    static void labelNativeSettings(View root, String settingsLabel) {
+        int width = root.getWidth();
+        int height = root.getHeight();
+        for (View view : flatten(root)) {
+            if (!(view instanceof TextView) || !isShown(view)) continue;
+            Rect rect = bounds(view);
+            if (rect.top < height * 0.10f && Math.abs(rect.centerX() - width / 2) < width * 0.20f) {
+                ((TextView) view).setText(settingsLabel);
+                break;
+            }
+        }
+        List<View> tabs = bottomTabs(root);
+        if (!tabs.isEmpty() && tabs.get(tabs.size() - 1) instanceof TextView) {
+            ((TextView) tabs.get(tabs.size() - 1)).setText(settingsLabel);
+        }
+    }
+
     static View findDevelopmentCard(View root) {
         int rootWidth = root.getWidth();
         int rootHeight = root.getHeight();

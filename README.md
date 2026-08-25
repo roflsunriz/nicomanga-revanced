@@ -12,7 +12,8 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 | 広告Activity／Provider／Service／広告識別子権限のManifest除去 | 実装・確認済み |
 | ログイン不要モード、List、Reading History、IndexedDB | 実装・5.0.0 Fabric実機確認済み |
 | Reading Historyから章・ページへ復帰 | 実装・5.0.0で章1／ページ10への復帰確認済み |
-| 「現在開発中です」の既定非表示と設定切替 | 実装・5.0.0 Fabric実機確認済み |
+| Nicomanga設定へ統合したReVanced設定画面 | 実装・5.0.0 Fabric実機確認済み |
+| 「現在開発中です」の既定非表示、余白除去、設定切替 | 実装・5.0.0 Fabric実機確認済み |
 | ReVanced ManagerでのURL取込と実適用 | v0.1.0公開・Manager 2.6.0実機適用確認済み |
 
 ## ビルド
