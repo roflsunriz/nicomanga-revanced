@@ -16,6 +16,7 @@ import java.util.Map;
 
 public final class NicomangaRevanced {
     private static final Map<Activity, OverlayController> CONTROLLERS = new HashMap<>();
+    private static final Map<Activity, DevelopmentNoticeController> DEVELOPMENT_NOTICES = new HashMap<>();
     private static boolean applicationInitialized;
 
     private NicomangaRevanced() {}
@@ -35,17 +36,39 @@ public final class NicomangaRevanced {
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
-            @Override public void onActivityDestroyed(Activity activity) {}
+            @Override
+            public void onActivityDestroyed(Activity activity) {
+                synchronized (NicomangaRevanced.class) {
+                    if (CONTROLLERS.containsKey(activity)) return;
+                    DevelopmentNoticeController notice = DEVELOPMENT_NOTICES.remove(activity);
+                    if (notice != null) notice.dispose();
+                }
+            }
         });
     }
 
     public static void initialize(Activity activity) {
-        activity.getWindow().getDecorView().postDelayed(() -> initializeOnMainThread(activity), 2500L);
+        DevelopmentNoticeController developmentNotice;
+        synchronized (NicomangaRevanced.class) {
+            developmentNotice = DEVELOPMENT_NOTICES.get(activity);
+            if (developmentNotice == null) {
+                developmentNotice = new DevelopmentNoticeController(activity);
+                DEVELOPMENT_NOTICES.put(activity, developmentNotice);
+            }
+        }
+        DevelopmentNoticeController controller = developmentNotice;
+        activity.getWindow().getDecorView().postDelayed(
+                () -> initializeOnMainThread(activity, controller),
+                2500L);
     }
 
-    private static synchronized void initializeOnMainThread(Activity activity) {
+    private static synchronized void initializeOnMainThread(
+            Activity activity,
+            DevelopmentNoticeController developmentNotice
+    ) {
+        if (activity.isFinishing() || activity.isDestroyed()) return;
         if (CONTROLLERS.containsKey(activity)) return;
-        OverlayController controller = new OverlayController(activity);
+        OverlayController controller = new OverlayController(activity, developmentNotice);
         CONTROLLERS.put(activity, controller);
 
         Window window = activity.getWindow();
@@ -69,9 +92,11 @@ public final class NicomangaRevanced {
                 if (value != activity) return;
                 synchronized (NicomangaRevanced.class) {
                     CONTROLLERS.remove(activity);
+                    DEVELOPMENT_NOTICES.remove(activity);
                 }
                 if (window.getCallback() == proxy) window.setCallback(original);
                 controller.destroy();
+                developmentNotice.dispose();
                 activity.getApplication().unregisterActivityLifecycleCallbacks(this);
             }
         };

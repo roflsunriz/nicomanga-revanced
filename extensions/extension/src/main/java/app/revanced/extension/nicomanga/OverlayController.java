@@ -31,6 +31,7 @@ final class OverlayController {
     private final ReVancedPreferences preferences;
     private final Translations translations;
     private final NavigationController navigation;
+    private final DevelopmentNoticeController developmentNotice;
     private final LibraryWebView library;
     private final LinearLayout bottomBar;
     private final List<Button> tabButtons = new ArrayList<>();
@@ -42,20 +43,12 @@ final class OverlayController {
     private MangaSnapshot currentManga;
     private String rememberedTitle;
     private String lastProgressSignature;
-    private WeakReference<View> developmentCard = new WeakReference<>(null);
-    private int developmentExpandedHeight = -1;
-    private android.graphics.Rect developmentBounds;
-    private boolean developmentLayoutCaptured;
-    private boolean developmentOriginalFillViewport;
-    private int developmentOriginalOverScrollMode = View.OVER_SCROLL_ALWAYS;
-    private WeakReference<android.widget.ScrollView> developmentScroll = new WeakReference<>(null);
-    private android.view.ViewTreeObserver.OnScrollChangedListener developmentScrollGuard;
     private final List<View> detailShiftedViews = new ArrayList<>();
     private WeakReference<ViewGroup> detailSpacingParent = new WeakReference<>(null);
     private int currentSection;
     private boolean destroyed;
 
-    OverlayController(Activity activity) {
+    OverlayController(Activity activity, DevelopmentNoticeController developmentNotice) {
         this.activity = activity;
         View content = activity.findViewById(android.R.id.content);
         if (!(content instanceof FrameLayout)) {
@@ -73,6 +66,7 @@ final class OverlayController {
         preferences = new ReVancedPreferences(activity);
         translations = Translations.from(activity);
         navigation = new NavigationController(activity, translations);
+        this.developmentNotice = developmentNotice;
         currentManga = preferences.lastManga();
         rememberedTitle = currentManga == null ? null : currentManga.title;
 
@@ -104,8 +98,7 @@ final class OverlayController {
 
                     @Override
                     public void onDevelopmentNoticeChanged(boolean visible) {
-                        View card = developmentCard.get();
-                        if (card != null) setDevelopmentSectionVisible(card, visible);
+                        developmentNotice.setVisible(visible);
                     }
                 });
 
@@ -264,7 +257,6 @@ final class OverlayController {
         int selectedNative = ViewTree.selectedTab(nativeTabs);
         if (onNativeRoot && !settingsScreen && !settingsView.isPageOpen() &&
                 (currentSection == 0 || (!fabric && selectedNative == 0))) {
-            updateDevelopmentNotice();
             addToList.setVisibility(View.GONE);
         } else if (settingsScreen || settingsView.isPageOpen()) {
             addToList.setVisibility(View.GONE);
@@ -309,113 +301,6 @@ final class OverlayController {
         }
 
         handler.postDelayed(tick, TICK_MILLIS);
-    }
-
-    private void updateDevelopmentNotice() {
-        View card = developmentCard.get();
-        if (card == null || card.getParent() == null || !card.isAttachedToWindow()) {
-            resetDevelopmentTracking();
-            card = ViewTree.findDevelopmentCard(root);
-            developmentCard = new WeakReference<>(card);
-        }
-        if (card != null) setDevelopmentSectionVisible(card, preferences.showDevelopmentNotice());
-    }
-
-    private void resetDevelopmentTracking() {
-        removeDevelopmentScrollGuard();
-        developmentLayoutCaptured = false;
-        developmentExpandedHeight = -1;
-        developmentBounds = null;
-        developmentScroll.clear();
-    }
-
-    private void setDevelopmentSectionVisible(View card, boolean visible) {
-        if (!(card.getParent() instanceof ViewGroup)) {
-            card.setVisibility(visible ? View.VISIBLE : View.GONE);
-            return;
-        }
-        ViewGroup container = (ViewGroup) card.getParent();
-        android.graphics.Rect section = ViewTree.bounds(card);
-        if (section.width() > 0 && section.height() > 0) {
-            developmentBounds = new android.graphics.Rect(section);
-        } else if (developmentBounds != null) {
-            section = new android.graphics.Rect(developmentBounds);
-        }
-        ViewGroup.LayoutParams containerParams = container.getLayoutParams();
-        android.widget.ScrollView scroll = container.getParent() instanceof android.widget.ScrollView
-                ? (android.widget.ScrollView) container.getParent()
-                : null;
-        if (!developmentLayoutCaptured) {
-            developmentExpandedHeight = containerParams == null ? -1 : containerParams.height;
-            developmentOriginalFillViewport = scroll != null && scroll.isFillViewport();
-            developmentScroll = new WeakReference<>(scroll);
-            developmentLayoutCaptured = true;
-        }
-        if (visible) {
-            if (containerParams != null) {
-                containerParams.height = developmentExpandedHeight;
-                container.setLayoutParams(containerParams);
-            }
-            android.widget.ScrollView capturedScroll = developmentScroll.get();
-            if (capturedScroll != null) {
-                removeDevelopmentScrollGuard();
-                capturedScroll.setFillViewport(developmentOriginalFillViewport);
-                capturedScroll.setOverScrollMode(developmentOriginalOverScrollMode);
-            }
-            for (int index = 0; index < container.getChildCount(); index++) {
-                View child = container.getChildAt(index);
-                android.graphics.Rect rect = ViewTree.bounds(child);
-                if (rect.bottom > section.top && rect.top < section.bottom) child.setVisibility(View.VISIBLE);
-            }
-            container.requestLayout();
-            return;
-        }
-
-        int contentTop = ViewTree.bounds(container).top;
-        int collapsedBottom = contentTop;
-        for (int index = 0; index < container.getChildCount(); index++) {
-            View child = container.getChildAt(index);
-            android.graphics.Rect rect = ViewTree.bounds(child);
-            if (rect.bottom > section.top && rect.top < section.bottom) {
-                child.setVisibility(View.GONE);
-            } else if (child.getVisibility() == View.VISIBLE) {
-                collapsedBottom = Math.max(collapsedBottom, rect.bottom);
-            }
-        }
-        if (containerParams != null && collapsedBottom > contentTop) {
-            if (scroll != null) {
-                scroll.setFillViewport(false);
-                installDevelopmentScrollGuard(scroll);
-            }
-            container.setMinimumHeight(0);
-            containerParams.height = collapsedBottom - contentTop;
-            container.setLayoutParams(containerParams);
-            container.requestLayout();
-            if (scroll != null) scroll.requestLayout();
-        }
-    }
-
-    private void installDevelopmentScrollGuard(android.widget.ScrollView scroll) {
-        if (developmentScrollGuard == null) {
-            developmentOriginalOverScrollMode = scroll.getOverScrollMode();
-            developmentScrollGuard = () -> {
-                android.widget.ScrollView current = developmentScroll.get();
-                if (current != null && !preferences.showDevelopmentNotice() && current.getScrollY() != 0) {
-                    current.scrollTo(0, 0);
-                }
-            };
-            scroll.getViewTreeObserver().addOnScrollChangedListener(developmentScrollGuard);
-        }
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        if (scroll.getScrollY() != 0) scroll.scrollTo(0, 0);
-    }
-
-    private void removeDevelopmentScrollGuard() {
-        android.widget.ScrollView scroll = developmentScroll.get();
-        if (scroll != null && developmentScrollGuard != null && scroll.getViewTreeObserver().isAlive()) {
-            scroll.getViewTreeObserver().removeOnScrollChangedListener(developmentScrollGuard);
-        }
-        developmentScrollGuard = null;
     }
 
     private void addCurrentManga() {
@@ -519,7 +404,6 @@ final class OverlayController {
         if (destroyed) return;
         destroyed = true;
         handler.removeCallbacksAndMessages(null);
-        removeDevelopmentScrollGuard();
         library.dispose();
         settingsView.dispose();
         root.removeView(library);
