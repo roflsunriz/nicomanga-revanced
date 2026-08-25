@@ -6,6 +6,7 @@
 - `git status --short --branch` で既存差分を確認する。
 - 更新対象XAPKは `nicomanga-apks/` へ置き、Gitへ追加しない。
 - JDK、Android SDK、GitHub CLI、ReVanced CLI v6以降を用意する。
+- GitHub Actionsをセルフホストrunnerで再現する場合、Node.js 24 Actionに対応するActions Runner v2.327.1以降を使用する。リポジトリ標準の`ubuntu-latest`はGitHub管理runnerを使用する。
 
 ## 更新
 
@@ -31,6 +32,7 @@
 ## 検証
 
 - Gradleビルドが警告なしで成功する。
+- Build／Releaseの`actions/checkout@v7`がGitHub管理runnerで成功し、Releaseの`actions/attest-build-provenance@v4`に必要な`id-token: write`／`attestations: write`権限とRVPを指す`subject-path`が維持されている。
 - RVPが7世代すべてへエラーなしに適用される。
 - Manifestに広告SDKコンポーネント、広告識別子権限、空のquery intentが残らない。
 - `apksigner verify --verbose` がv2またはv3署名を検証する。

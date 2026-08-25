@@ -8,6 +8,7 @@
 
 ### Changed
 
+- GitHub ActionsのNode.js 24移行とビルド来歴証明の互換性を維持するため、Build／Releaseの`actions/checkout`をv7、Releaseの`actions/attest-build-provenance`をv4へ更新した。
 - Release本文と変更履歴の不一致を防ぐため、タグと同じバージョンのCHANGELOG節だけを公開する生成処理へ統一した。
 
 ## [0.1.3] - 2026-08-25
