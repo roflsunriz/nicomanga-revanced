@@ -19,6 +19,8 @@
 .\scripts\build.ps1
 ```
 
+依存関係を変更した場合は `--write-locks` でlockfileを更新し、OSV-Scannerで `patches/gradle.lockfile` と `extensions/extension/gradle.lockfile` を検査する。
+
 6. ReVanced CLIで保存済みの全世代ベースAPKへ適用し、各ログに `"Nicomanga ReVanced" succeeded` があることを確認する。
 7. 最新XAPKをAnti Split MまたはAPKEditorで単一APK化し、RVPを適用する。
 8. 実機では最初に `検証用パッケージ名を使用` を有効化し、公式版を消さずに起動・画面・ログを確認する。

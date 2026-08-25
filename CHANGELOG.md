@@ -16,5 +16,6 @@
 
 ### Security
 
+- ビルド・パッチ処理で既知脆弱性を含む旧依存候補を使わないよう、ReVanced Patcher 22.0.1、ReVanced Gradle plugin 1.0.0-dev.11、smali 3.0.9へ更新した。
 - 広告SDKの通信と全画面広告生成を開始前に止めるため、AppLovin、Google Mobile Ads、Meta Audience Network、TradPlus、Vungle、Unity Ads等の初期化・読込・表示入口を無効化した。
 - 広告SDKの自動起動と広告識別子利用を防ぐため、広告Activity／Provider／Service／Startup initializer／関連権限をManifestから削除した。

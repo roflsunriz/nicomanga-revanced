@@ -1,5 +1,19 @@
 group = "io.github.roflsunriz"
 
+configurations.named("compileClasspath") {
+    resolutionStrategy.activateDependencyLocking()
+    resolutionStrategy.force("org.apache.commons:commons-lang3:3.18.0")
+}
+
+configurations.named("runtimeClasspath") {
+    resolutionStrategy.activateDependencyLocking()
+    resolutionStrategy.force("org.apache.commons:commons-lang3:3.18.0")
+}
+
+dependencyLocking {
+    lockMode.set(org.gradle.api.artifacts.dsl.LockMode.STRICT)
+}
+
 patches {
     about {
         name = "Nicomanga ReVanced"
