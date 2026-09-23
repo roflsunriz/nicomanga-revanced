@@ -8,6 +8,7 @@
 
 ### Changed
 
+- 依存更新を安全に省力化するため、Dependabot の patch／minor PR を既存 CI の全チェック成功後に自動取り込みし、失敗ジョブを一度再実行する設定を追加した。
 - GitHub ActionsのNode.js 24移行とビルド来歴証明の互換性を維持するため、Build／Releaseの`actions/checkout`をv7、Releaseの`actions/attest-build-provenance`をv4へ更新した。
 - Release本文と変更履歴の不一致を防ぐため、タグと同じバージョンのCHANGELOG節だけを公開する生成処理へ統一した。
 
