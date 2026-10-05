@@ -1,6 +1,6 @@
 # Nicomanga ReVanced
 
-Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式のRVPとしてビルドし、Nicomangaの特定バージョン番号を固定せず適用します。
+Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式のRVPとしてビルドします。適用対象のNicomangaを特定のバージョン番号に固定していません。
 
 ## 実装状況
 
@@ -19,7 +19,7 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 
 ## ビルド
 
-前提:
+ビルドには次の環境が必要です。
 
 - JDK 17以上
 - Android SDK
@@ -43,7 +43,7 @@ ReVanced Manager／CLIが扱えるのは単一APKです。XAPKをそのまま入
 
 `検証用パッケージ名を使用` は既定で無効です。既存のNicomangaを残したまま並行インストールする開発・検証時だけ有効にしてください。
 
-リリース後、Managerへ追加するJSONは次の固定URLです。
+Managerへ追加する`patches.json`のURLは次のとおりです。
 
 ```text
 https://github.com/roflsunriz/nicomanga-revanced/releases/latest/download/patches.json
