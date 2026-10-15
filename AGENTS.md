@@ -38,6 +38,12 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 - 実機検証では中間生成物のゴミを残さない
 
 ## Environment
-- `nicomanga-apks`にあるファイルはapkではなくxapkである
-- `nicomanga-apks`にあるxapkで複数世代の適用確認ができる
-- XAPKはAnti Split Mで単一APK化できる(Anti Split MはAndroidアプリ)
+
+具体的な手順・構成・知見は [findings.md](<findings.md#agents-4>) に移動しました。着手前に該当条件を確認してください。
+
+
+## findings.md の確認と記録
+
+- [COMMON-AGENTS.md](COMMON-AGENTS.md) を全文読了した後、調査・計画・コマンド実行・編集の前に [findings.md](findings.md) も先頭から末尾まで全文読む。出力省略や要約を読了として扱わない。
+- 構成一覧、環境情報、コマンド、調査結果、過去の事実は `findings.md` に記録する。このファイルには目的、純粋な行動義務と禁止条件を残す。
+- 変更履歴と実測検証を記録し、ユーザーの指示、変更禁止、秘密情報保護、観測可能な完了条件を弱めない。
