@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 重複するビルドCIを自動で取り消し、Gradleの依存・ビルドキャッシュと並列タスクを利用してRVP生成を短縮した。
+
 ### Fixed
 
 - CI と Dependabot の分類の実行順が前後しても更新を取りこぼさないよう、同じ PR 番号と head SHA を再照合する経路を追加した。
