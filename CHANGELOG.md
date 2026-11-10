@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- READMEでfindings.mdへの案内に置き換わっていた本文を復元し、構成・開発・検証の説明をREADMEから直接読めるようにした。移動後のREADME更新は保持した。
+- ReVanced Managerへ登録するJSON配布URLを `raw.githubusercontent.com` に統一した。
+- 最新の公開リリースに限り、配布用patches.jsonを既定ブランチへ同期する処理を追加し、次回リリース後もraw URLのJSONが更新されるようにした。
+
+
 ### Changed
 
 - GitHub Actions の月間利用時間を抑えるため、Dependabot version update と自動マージを毎週・即時処理から毎月28日（Asia/Tokyo）の月末一括処理へ変更した。

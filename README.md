@@ -19,7 +19,19 @@ Nicomanga（`com.lovehug`）向けのReVanced Patchesです。Patcher v22形式�
 
 ## ビルド
 
-具体的な手順・構成・知見は [findings.md](<findings.md#readme-2>) に移動しました。着手前に該当条件を確認してください。
+ビルドには次の環境が必要です。
+
+- JDK 17以上
+- Android SDK
+- GitHub CLIで認証済みであること
+
+PowerShellから次を実行します。
+
+```powershell
+.\scripts\build.ps1
+```
+
+成果物は `patches/build/libs/patches-<version>.rvp` に生成されます。認証トークンはファイルへ保存せず、ビルドプロセスの環境変数だけへ渡します。
 
 ## 適用
 
@@ -34,7 +46,7 @@ ReVanced Manager／CLIが扱えるのは単一APKです。XAPKをそのまま入
 Managerへ追加する`patches.json`のURLは次のとおりです。
 
 ```text
-https://github.com/roflsunriz/nicomanga-revanced/releases/latest/download/patches.json
+https://raw.githubusercontent.com/roflsunriz/nicomanga-revanced/main/patches.json
 ```
 
 ## セキュリティ
@@ -49,4 +61,6 @@ NicomangaのAPK／XAPK、逆コンパイル結果、署名鍵は配布物へ含�
 
 ## 依存更新の自動処理
 
-具体的な手順・構成・知見は [findings.md](<findings.md#readme-6>) に移動しました。着手前に該当条件を確認してください。
+更新PRの取り込みは、必要なCIチェックにすべて成功したものだけを対象に、毎月28日18:00（Asia/Tokyo）の月末処理で行います。
+
+Dependabot は対象の依存関係を毎月28日00:00（Asia/Tokyo）に確認します。patch／minor 更新は PR のチェック（Build）が成功した後に自動で squash merge されます。CI の失敗ジョブは 1 回だけ再実行します。再失敗した PR は残して手動で修正します。major 更新も互換性を確認し、同じ月末処理で取り込みます。

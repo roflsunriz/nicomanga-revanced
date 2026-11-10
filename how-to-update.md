@@ -1,5 +1,11 @@
 # 更新手順
 
+## ReVanced Manager向けJSONの配布
+
+登録用URLは `https://raw.githubusercontent.com/roflsunriz/nicomanga-revanced/main/patches.json` です。
+
+release workflowは、リリースの公開に成功した後、生成した `patches.json` を既定ブランチへ同期します。最新リリース以外の再実行では同期せず、JSONの版不一致や同時更新を検出した場合は失敗します。失敗時は最新リリースのJSONと既定ブランチの差分を確認し、最新のJSONだけを再反映してください。RVPの配布先はGitHub Releasesのままです。
+
 ## 前提
 
 具体的な手順・構成・知見は [findings.md](<findings.md#update-1>) に移動しました。着手前に該当条件を確認してください。
